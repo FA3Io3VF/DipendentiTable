@@ -1,0 +1,242 @@
+
+		function createTable(tableId, dataApi, countApi, tableFormat) {
+			const limitSelect = document.getElementById(`${tableId}-limit`);
+			const firstPageButton = document.getElementById(`${tableId}-first-page`);
+			const prevPageButton = document.getElementById(`${tableId}-prev-page`);
+			const nextPageButton = document.getElementById(`${tableId}-next-page`);
+			const lastPageButton = document.getElementById(`${tableId}-last-page`);
+			const pageInfo = document.getElementById(`${tableId}-page-info`);
+			const countInfo = document.getElementById(`${tableId}-count`);
+			const searchCognomeButton = document.getElementById(`${tableId}-cercaCognome`);
+			const searchCognomeInput = document.getElementById(`${tableId}-cercaCognomeInput`);
+			const searchTargaButton = document.getElementById(`${tableId}-cercaTarga`);
+			const searchTargaInput = document.getElementById(`${tableId}-cercaTargaInput`);
+
+			let tableData = [];
+			let offset = 0;
+			let limit = parseInt(limitSelect.value);
+			let count = 0;
+			let cognome = null;
+			let respo = undefined;
+			let targa = null;
+
+			function updateTable() {
+				// Disabilita i pulsanti e il selettore "limit"
+				prevPageButton.disabled = true;
+				nextPageButton.disabled = true;
+				limitSelect.disabled = true;
+
+				let dataUrl = `${dataApi}?offset=${offset}&limit=${limit}`;
+				if (cognome) {
+					dataUrl += `&cognome=${cognome}`;
+				}
+
+				if (targa) {
+					dataUrl += `&targa=${targa}`;
+				}
+
+				fetch(dataUrl)
+					.then((response) => {
+						if (!response.ok) {
+							throw new Error('Nessun dato trovato.');
+						}
+						return response.json();
+					})
+					.then((data) => {
+
+						tableData = data;
+
+						const table = document.querySelector(`#${tableId}-table`);
+						if (window.innerWidth < 1200) {
+							table.classList.add("hidden-columns");
+						} else {
+							table.classList.remove("hidden-columns");
+						}
+
+						const tbody = document.querySelector(`#${tableId}-table tbody`);
+						tbody.innerHTML = "";
+
+						data.forEach((row) => {
+							const tr = document.createElement("tr");
+							Object.values(tableFormat).forEach((key) => {
+								const td = document.createElement("td");
+								td.textContent = row[key];
+								tr.appendChild(td);
+							});
+							tbody.appendChild(tr);
+						});
+
+						// Aggiorna l'altezza dei titoli della tabella
+						const ths = document.querySelectorAll(`#${tableId}-table th`);
+						const tds = document.querySelectorAll(`#${tableId}-table td`);
+						ths.forEach((th, index) => {
+
+							/*utilizza la larghezza del td corrente per impostare la larghezza del th corrispondente, 
+							ma non considera il padding e il bordo:
+
+							const tdWidth = tds[index].clientWidth;*/
+
+							const tdWidth = tds[index].offsetWidth;
+							th.style.width = `${tdWidth}px`;
+						});
+
+					})
+					.catch((error) => {
+						const tbody = document.querySelector(`#${tableId}-table tbody`);
+						tbody.innerHTML = `<tr><td colspan="${Object.keys(tableFormat).length}">Nessun dato trovato</td></tr>`;
+					});
+
+				fetch(countApi)
+					.then((response) => response.json())
+					.then((data) => {
+						count = parseInt(data);
+						const currentPage = Math.floor(offset / limit) + 1;
+						const totalPages = Math.ceil(count / limit);
+						countInfo.textContent = `Visualizzati ${offset + 1}-${Math.min(
+							offset + limit,
+							count
+						)} di ${count} risultati`;
+						pageInfo.textContent = `Pagina ${currentPage} di ${totalPages}`;
+
+						// Abilita i pulsanti e il selettore "limit"
+						limitSelect.disabled = false;
+						if (offset > 0) {
+							prevPageButton.disabled = false;
+							firstPageButton.disabled = false;
+						}
+						if (offset + limit < count) {
+							nextPageButton.disabled = false;
+							lastPageButton.disabled = false;
+						}
+
+						searchCognomeButton.disabled = false;
+						searchCognomeInput.disabled = false;
+						cognome = null;
+					})
+					.catch((error) => {
+						console.error(error);
+
+					});
+			}
+
+			limitSelect.addEventListener("change", () => {
+				limit = parseInt(limitSelect.value);
+				limitValue = limit;
+				offset = 0;
+				updateTable();
+			});
+
+			firstPageButton.addEventListener("click", () => {
+				offset = 0;
+				updateTable();
+			});
+
+			prevPageButton.addEventListener("click", () => {
+				offset -= limit;
+				updateTable();
+			});
+
+			nextPageButton.addEventListener("click", () => {
+				offset += limit;
+				updateTable();
+			});
+
+			lastPageButton.addEventListener("click", () => {
+				offset = Math.floor(count / limit) * limit;
+				updateTable();
+			});
+
+			searchCognomeButton.addEventListener("click", () => {
+				cognome = searchCognomeInput.value.trim();
+				searchCognomeInput.value = "";
+				offset = 0;
+				updateTable();
+
+			});
+
+			searchCognomeInput.addEventListener("keyup", () => {
+				event.preventDefault();
+				if (event.keyCode === 13) {
+					searchCognomeButton.click();
+				}
+			});
+
+			searchTargaButton.addEventListener("click", () => {
+				targa = searchTargaInput.value.trim();
+				searchTargaInput.value = "";
+				offset = 0;
+				updateTable();
+			});
+
+			searchTargaInput.addEventListener("keyup", () => {
+				event.preventDefault();
+				if (event.keyCode === 13) {
+					searchTargaButton.click();
+				}
+			});
+
+
+
+			updateTable();
+
+			let limitValue = limitSelect.value;
+
+			/*per evitare che i tag si disallineino al resize bisogna aggiungere un gestore di eventi */
+			window.addEventListener("resize", () => {
+				const table = document.querySelector(`#${tableId}-table`);
+				const tbody = document.querySelector(`#${tableId}-table tbody`);
+				tbody.innerHTML = "";
+
+				tableData.forEach((row) => {
+					const tr = document.createElement("tr");
+					Object.values(tableFormat).forEach((key) => {
+						const td = document.createElement("td");
+						td.textContent = row[key];
+						tr.appendChild(td);
+					});
+					tbody.appendChild(tr);
+				});
+				const ths = document.querySelectorAll(`#${tableId}-table th`);
+				const tds = document.querySelectorAll(`#${tableId}-table td`);
+				ths.forEach((th, index) => {
+					const tdWidth = tds[index].offsetWidth;
+					th.style.width = `${tdWidth}px`;
+				});
+
+				if (window.innerWidth < 1200) {
+					table.classList.add("hidden-columns");
+				} else {
+					table.classList.remove("hidden-columns");
+				}
+
+				if (window.innerWidth < 768) {
+					limitSelect.value = 5;
+					if (limitValue != limitSelect.value) { limitSelect.dispatchEvent(new Event('change')); }
+				}
+
+				if (window.innerWidth > 768) {
+					limitSelect.value = 10;
+					if (limitValue != limitSelect.value) { limitSelect.dispatchEvent(new Event('change')); }
+				}
+
+			});
+
+		}
+		  
+
+		createTable(
+			"dipendenti",
+			"http://localhost:8000/associazioni",
+			"http://localhost:8000/associazioni/number",
+			{
+				"ID": "id",
+				"Qualifica": "qualifica",
+				"Nome": "nome",
+				"Cognome": "cognome",
+				"Targa": "targa",
+				"Mezzo": "descrizione",
+				"Istruttore": "istruttore",
+				"Data Formazione": "data_formazione",
+			});
+
+	
